@@ -1,5 +1,7 @@
-import {Body, Controller , Delete, Get, HttpCode, Param, Patch, Post, Query} from '@nestjs/common';
-import { UserService,UserInterface } from './user.service';
+import {Body, ParseIntPipe,ValidationPipe, Controller , Delete, Get, HttpCode, Param, Patch, Post, Query} from '@nestjs/common';
+import { UserService } from './user.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('user') // route: /user
 export class UserController{
@@ -10,24 +12,20 @@ export class UserController{
         console.log(role);
         return this.userService.getUsers(role);
     }
-    // @Get('intern') // GET /user/intern
-    // findAllInterns(){
-    //     return []
-    // }
     
     @Get(':id') // /user/:id
-    findOne(@Param('id') id:number){ // GET /user/1
+    findOne(@Param('id', ParseIntPipe) id:number){ // GET /user/1
         // return this.userService.getUser();
-        return this.userService.findOne(+id);
+        return this.userService.findOne(id);
     }
     @Post() //POST /user
-    createUser(@Body() user:UserInterface){
+    createUser(@Body(ValidationPipe) user:CreateUserDto){
         return this.userService.createUser(user);
     }
     
     @Patch(':id') // PATCH /user/:id/
-    updateUser(@Param('id') id:number, @Body() user:UserInterface){
-        return this.userService.updateUser(+id,user);
+    updateUser(@Param('id' , ParseIntPipe) id:number, @Body() user:UpdateUserDto){
+        return this.userService.updateUser(id,user);
     }
     
     @Delete(':id')
