@@ -8,6 +8,7 @@ export class CreateUserDto {
 
     @IsEmail()
     email: string;
-    @IsEnum(['Intern', 'Admin' , 'Engineer'], { message: 'Invalid role' })
-    role: 'Intern' | 'Admin' | 'Engineer';
+    @IsString()
+    @IsNotEmpty()
+    password:string
 }

@@ -1,59 +1,63 @@
-import { Injectable ,NotFoundException} from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable ,NotFoundException} from "@nestjs/common";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { InjectRepository } from "@nestjs/typeorm";
+import User from "./user.entity";
+import { Repository } from "typeorm";
+import * as bcrypt from 'bcryptjs';
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
 export interface UserInterface {
     id: number;
     name: string;
     email: string;
-    role: string;
+    password:string;
   }
 @Injectable()
 export class UserService{
-    private users: UserInterface[] = [
-        { id: 1, name: 'Alice Johnson', email: 'alice.johnson@example.com', role: 'Engineer' },
-        { id: 2, name: 'Bob Smith', email: 'bob.smith@example.com', role: 'Intern' },
-        { id: 3, name: 'Charlie Brown', email: 'charlie.brown@example.com', role: 'Admin' },
-        { id: 4, name: 'David Wilson', email: 'david.wilson@example.com', role: 'Engineer' },
-        { id: 5, name: 'Eva Green', email: 'eva.green@example.com', role: 'Intern' },
-        { id: 6, name: 'Frank White', email: 'frank.white@example.com', role: 'Admin' },
-        { id: 7, name: 'Grace Black', email: 'grace.black@example.com', role: 'Engineer' },
-        { id: 8, name: 'Henry Yellow', email: 'henry.yellow@example.com', role: 'Intern' },
-        { id: 9, name: 'Ivy Blue', email: 'ivy.blue@example.com', role: 'Admin' },
-        { id: 10, name: 'Jack Red', email: 'jack.red@example.com', role: 'Engineer' },
-      ];
-    getUsers(role?: 'Intern'| 'Admin' | 'Engineer'){
-        
-        if(role){
-            const res =  this.users.filter(user => user.role === role);
-            if(res.length===0) throw new NotFoundException('Role Not Found');
-            return res;
+    constructor(
+        @InjectRepository(User)
+        private usersRepository: Repository<User>,
+        private jwtService: JwtService,
+        private configService : ConfigService
+    ){}
+    
+    async login(user:UpdateUserDto): Promise<{token:string}>{
+        const {email , password} = user;
+        const existingUser = await this.usersRepository.findOne({where:{email}});
+        if(existingUser){
+            const isMatch = await bcrypt.compare(password , existingUser.password );
+            if(isMatch){
+                return {token : this.jwtService.sign({id:existingUser.id})};
+            }
+            else{
+                throw new ForbiddenException('Invalid credentials');
+            }
         }
-        return this.users;
+        else throw new NotFoundException('User not found');
     }
-    findOne(id:number){
-        const res =  this.users.filter(user => user.id === id)[0];
-        if(!res) throw new NotFoundException('User Not Found');
+
+    async createUser(user:CreateUserDto):Promise<User>{
+        const existingUser = await this.usersRepository.findOne({where:{email:user.email}});
+        if(existingUser){
+            throw new ConflictException('User with this email already exists');
+        }
+        try {
+            const saltRounds = 10;
+            const hashedPassword = await bcrypt.hash(user.password , saltRounds);
+            const res  = await this.usersRepository.save({...user,password:hashedPassword});
+            console.log(res);
+            return res;
+        } catch (error) {
+            console.log(error)
+        }
+    }
+    
+    async getById(id:number): Promise <User>{
+        const res=  await this.usersRepository.findOne({where:{id}});
         return res;
     }
-    createUser(user:CreateUserDto){
-        const id = this.users.length+1;
-        this.users.push({id, ...user});
-        return {id,...user};
-    }
-    updateUser(id :number, userData:UpdateUserDto){
-        let updatedUser={};
-        this.users = this.users.map((user:UserInterface) =>{
-            if(user.id === id){
-                updatedUser = {...user, ...userData};
-                return {...user, ...userData};
-            }
-            return user;
-        })
-        return updatedUser
-    }
-    deleteUser(id:number){
-        this.users = this.users.filter(user => user.id !== id);
-        return {message: 'User deleted successfully.'}
-    }
+
+ 
 
 }
